@@ -4,6 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker Pulls](https://img.shields.io/docker/pulls/shmayro/dockerify-android)](https://hub.docker.com/r/shmayro/dockerify-android)
+[![GitHub Release](https://img.shields.io/github/v/release/shmayro/dockerify-android)](https://github.com/shmayro/dockerify-android/releases)
 [![GitHub Issues](https://img.shields.io/github/issues/shmayro/dockerify-android)](https://github.com/shmayro/dockerify-android/issues)
 [![GitHub Stars](https://img.shields.io/github/stars/shmayro/dockerify-android?style=social)](https://github.com/shmayro/dockerify-android/stargazers)
 
@@ -38,6 +39,7 @@ Access and control the Android emulator directly in your web browser with the in
   - [Customizing Device Screen](#customizing-device-screen)
 - [First Boot Process](#-first-boot-process)
 - [Container Logs](#-container-logs)
+- [Versioning and Releases](#-versioning-and-releases)
 - [Roadmap](#-roadmap)
 - [Troubleshooting](#-troubleshooting)
 - [Contributing](#-contributing)
@@ -90,6 +92,7 @@ To simplify the setup process, you can use the provided [docker-compose.yml](htt
     ```
 
     > **Note:** This command launches the Android emulator and web interface. First boot takes some time to initialize. Once ready, the device will appear in the web interface at http://localhost:8000.
+
 
 ## 📡 **Usage**
 
@@ -196,6 +199,12 @@ This includes:
 - Supervisor logs
 - Android emulator stdout/stderr
 - First-boot process logs
+
+## 🏷️ **Versioning and Releases**
+
+Dockerify Android uses GitHub Releases as the source of truth for stable project versions. Publishing a release such as `v1.2.3` creates matching Docker image tags: `1.2.3`, `1.2`, `1`, and `latest`.
+
+Builds from the `main` branch are published as development images using `edge` and `sha-<short-sha>` tags.
 
 ## 🚧 **Roadmap**
 

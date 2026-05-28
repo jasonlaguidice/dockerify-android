@@ -1,4 +1,4 @@
-name: Build and Push Docker Image to Docker Hub
+name: Build and Publish Docker Image
 
 on:
   push:
@@ -6,7 +6,10 @@ on:
   pull_request:
     branches: [ main ]
   release:
-    types: [ created ]
+    types: [ published ]
+
+env:
+  IMAGE_NAME: shmayro/dockerify-android
 
 jobs:
   build:
@@ -14,36 +17,85 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: true
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
+
+      - name: Prepare Docker metadata
+        id: meta
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          SHA: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease || 'false' }}
+        run: |
+          python3 <<'PY' >> "$GITHUB_OUTPUT"
+          import os
+          import re
+          from datetime import datetime, timezone
+
+          image = os.environ["IMAGE_NAME"]
+          event_name = os.environ["EVENT_NAME"]
+          ref_name = os.environ["REF_NAME"]
+          ref_type = os.environ["REF_TYPE"]
+          sha = os.environ["SHA"]
+          repository = os.environ["REPOSITORY"]
+          prerelease = os.environ.get("RELEASE_PRERELEASE", "false").lower() == "true"
+
+          tags = []
+          version = ref_name
+
+          if event_name == "push" and ref_type == "branch" and ref_name == "main":
+              version = "edge"
+              tags.extend([f"{image}:edge", f"{image}:sha-{sha[:7]}"])
+          elif event_name == "release":
+              version = ref_name.removeprefix("v")
+              tags.append(f"{image}:{version}")
+
+              stable = re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version)
+              if stable:
+                  major, minor, _patch = version.split(".")
+                  tags.extend([
+                      f"{image}:{major}.{minor}",
+                      f"{image}:{major}",
+                  ])
+                  if not prerelease:
+                      tags.append(f"{image}:latest")
+
+          labels = {
+              "org.opencontainers.image.created": datetime.now(timezone.utc).isoformat(),
+              "org.opencontainers.image.revision": sha,
+              "org.opencontainers.image.source": f"https://github.com/{repository}",
+              "org.opencontainers.image.version": version,
+          }
+
+          print("tags<<EOF")
+          print("\n".join(dict.fromkeys(tags)))
+          print("EOF")
+
+          print("labels<<EOF")
+          print("\n".join(f"{key}={value}" for key, value in labels.items()))
+          print("EOF")
+          PY
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v2
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Get current date
-        if: github.ref == 'refs/heads/main'
-        id: date
-        run: echo "DATE=$(date +'%d-%m-%y')" >> $GITHUB_ENV
-
-      - name: Get Pull Request ID
-        if: github.event_name == 'pull_request'
-        id: pr
-        run: echo "PR_ID=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
-
       - name: Build and Push Docker Image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
-          tags: |
-            ${{ github.ref == 'refs/heads/main' && 'shmayro/dockerify-android:latest' || '' }}
-            ${{ github.ref == 'refs/heads/main' && format('shmayro/dockerify-android:{0}', env.DATE) || '' }}
-            ${{ github.event_name == 'pull_request' && format('shmayro/dockerify-android:pr-{0}', env.PR_ID) || '' }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
