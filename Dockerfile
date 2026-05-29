@@ -20,16 +20,18 @@ RUN apt-get update && \
 
 # Bake in Google ndk_translation prebuilts (ARM-on-x86 native bridge).
 # Source: Kaz205 fork (Chrome OS Android 11 / guybrush_cheets) — matches the emulator's API 30.
+# Stored as the upstream tarball; install_arm_translation extracts on demand.
 ARG NDK_TRANSLATION_REPO=Kaz205/vendor_google_proprietary_ndk_translation-prebuilt
 ARG NDK_TRANSLATION_REF=chromeos_guybrush
-RUN mkdir -p /opt/ndk-translation && \
-    wget -q -O /tmp/ndk.tar.gz \
-        "https://codeload.github.com/${NDK_TRANSLATION_REPO}/tar.gz/refs/heads/${NDK_TRANSLATION_REF}" && \
-    tar -xzf /tmp/ndk.tar.gz \
-        --strip-components=2 \
-        -C /opt/ndk-translation \
-        "$(basename "$NDK_TRANSLATION_REPO")-${NDK_TRANSLATION_REF}/prebuilts" && \
-    rm /tmp/ndk.tar.gz
+RUN wget -q -O /opt/ndk-translation.tar.gz \
+    "https://codeload.github.com/${NDK_TRANSLATION_REPO}/tar.gz/refs/heads/${NDK_TRANSLATION_REF}"
+
+# Bake in rootAVD (Magisk-based AVD rooting tool + bundled Magisk.zip).
+# Source: https://gitlab.com/newbit/rootAVD — install_root extracts on demand.
+ARG ROOTAVD_REPO=newbit/rootAVD
+ARG ROOTAVD_REF=master
+RUN wget -q -O /opt/rootavd.tar.gz \
+    "https://gitlab.com/${ROOTAVD_REPO}/-/archive/${ROOTAVD_REF}/$(basename "$ROOTAVD_REPO")-${ROOTAVD_REF}.tar.gz"
 
 # Set up Android SDK
 RUN mkdir -p /opt/android-sdk/cmdline-tools && \

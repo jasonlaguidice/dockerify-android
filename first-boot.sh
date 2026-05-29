@@ -50,10 +50,10 @@ magisk_active() {
 install_gapps_magisk_module() {
   echo "Installing GAPPS as a Magisk module ..."
   local MOD=/data/adb/modules/gapps
-  adb push gapps-11/etc       /data/local/tmp/gapps-etc
-  adb push gapps-11/framework /data/local/tmp/gapps-framework
-  adb push gapps-11/app       /data/local/tmp/gapps-app
-  adb push gapps-11/priv-app  /data/local/tmp/gapps-priv-app
+  adb push /tmp/gapps/etc       /data/local/tmp/gapps-etc
+  adb push /tmp/gapps/framework /data/local/tmp/gapps-framework
+  adb push /tmp/gapps/app       /data/local/tmp/gapps-app
+  adb push /tmp/gapps/priv-app  /data/local/tmp/gapps-priv-app
   adb shell "
     rm -rf $MOD
     mkdir -p $MOD/system
@@ -74,29 +74,30 @@ PROP
 
 install_gapps_system() {
   prepare_system
-  adb push gapps-11/etc       /system
-  adb push gapps-11/framework /system
-  adb push gapps-11/app       /system
-  adb push gapps-11/priv-app  /system
+  adb push /tmp/gapps/etc       /system
+  adb push /tmp/gapps/framework /system
+  adb push /tmp/gapps/app       /system
+  adb push /tmp/gapps/priv-app  /system
 }
 
 install_gapps() {
   adb wait-for-device
   adb root
   echo "Installing GAPPS ..."
-  wget https://sourceforge.net/projects/opengapps/files/x86_64/20220503/open_gapps-x86_64-11.0-pico-20220503.zip/download -O gapps-11.zip
-  unzip gapps-11.zip 'Core/*' -d gapps-11 && rm gapps-11.zip
-  rm gapps-11/Core/setup*
-  lzip -d gapps-11/Core/*.lz
-  for f in gapps-11/Core/*.tar; do
-    tar -x --strip-components 2 -f "$f" -C gapps-11
+  mkdir -p /tmp/gapps
+  wget https://sourceforge.net/projects/opengapps/files/x86_64/20220503/open_gapps-x86_64-11.0-pico-20220503.zip/download -O /tmp/gapps.zip
+  unzip /tmp/gapps.zip 'Core/*' -d /tmp/gapps && rm /tmp/gapps.zip
+  rm /tmp/gapps/Core/setup*
+  lzip -d /tmp/gapps/Core/*.lz
+  for f in /tmp/gapps/Core/*.tar; do
+    tar -x --strip-components 2 -f "$f" -C /tmp/gapps
   done
   if magisk_active; then
     install_gapps_magisk_module
   else
     install_gapps_system
   fi
-  rm -r gapps-11
+  rm -rf /tmp/gapps
   adb reboot
   adb wait-for-device
   touch /data/.gapps-done
@@ -107,8 +108,9 @@ install_root() {
   adb root
   echo "Root Script Starting..."
   # Root the AVD by patching the ramdisk.
-  git clone https://gitlab.com/newbit/rootAVD.git
-  pushd rootAVD
+  mkdir -p /tmp/rootavd
+  tar -xzf /opt/rootavd.tar.gz --strip-components=1 -C /tmp/rootavd
+  pushd /tmp/rootavd
   sed -i 's/read -t 10 choice/choice=1/' rootAVD.sh
   ./rootAVD.sh system-images/android-30/default/x86_64/ramdisk.img
   cp /opt/android-sdk/system-images/android-30/default/x86_64/ramdisk.img /data/android.avd/ramdisk.img
@@ -142,14 +144,14 @@ install_root() {
   popd
   echo "Root Done"
   sleep 10
-  rm -r rootAVD
+  rm -rf /tmp/rootavd
   touch /data/.root-done
 }
 
 install_arm_translation_magisk_module() {
   echo "Installing ARM translation as a Magisk module ..."
   local MOD=/data/adb/modules/ndk_translation
-  adb push /opt/ndk-translation /data/local/tmp/ndk
+  adb push /tmp/ndk-translation /data/local/tmp/ndk
   adb shell "
     rm -rf $MOD
     mkdir -p $MOD/system/bin $MOD/system/etc $MOD/system/lib $MOD/system/lib64
@@ -197,10 +199,10 @@ install_arm_translation_system() {
   prepare_system
   echo "Installing ARM translation (ndk_translation) ..."
 
-  adb push /opt/ndk-translation/bin   /system/
-  adb push /opt/ndk-translation/etc   /system/
-  adb push /opt/ndk-translation/lib   /system/
-  adb push /opt/ndk-translation/lib64 /system/
+  adb push /tmp/ndk-translation/bin   /system/
+  adb push /tmp/ndk-translation/etc   /system/
+  adb push /tmp/ndk-translation/lib   /system/
+  adb push /tmp/ndk-translation/lib64 /system/
 
   adb shell '
     chmod 755 /system/bin/ndk_translation_program_runner_binfmt_misc /system/bin/ndk_translation_program_runner_binfmt_misc_arm64
@@ -230,6 +232,8 @@ EOF
 install_arm_translation() {
   adb wait-for-device
   adb root
+  mkdir -p /tmp/ndk-translation
+  tar -xzf /opt/ndk-translation.tar.gz --strip-components=2 --wildcards -C /tmp/ndk-translation '*/prebuilts/*'
   # On a live-Magisk device, /system is wrapped in a read-only magic mount;
   # install as a Magisk module so the changes land via Magisk's own overlay.
   if magisk_active; then
@@ -237,6 +241,7 @@ install_arm_translation() {
   else
     install_arm_translation_system
   fi
+  rm -rf /tmp/ndk-translation
   adb reboot
   adb wait-for-device
   touch /data/.arm-translation-done
