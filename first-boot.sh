@@ -56,6 +56,8 @@ install_gapps() {
   adb push gapps-11/app /system
   adb push gapps-11/priv-app /system
   rm -r gapps-11
+  adb reboot
+  adb wait-for-device
   touch /data/.gapps-done
 }
 
@@ -109,6 +111,7 @@ EOF
   '
 
   adb reboot
+  adb wait-for-device
   touch /data/.arm-translation-done
 }
 
@@ -132,32 +135,17 @@ if bool_true "$GAPPS_SETUP" && [ ! -f /data/.gapps-done ]; then gapps_needed=tru
 if bool_true "$ROOT_SETUP" && [ ! -f /data/.root-done ]; then root_needed=true; fi
 if bool_true "$ARM_TRANSLATION" && [ ! -f /data/.arm-translation-done ]; then arm_translation_needed=true; fi
 
-needs_reboot() {
-  # Reboot needed if only GAPPS was installed (no root or ARM translation)
-  [ "$gapps_needed" = true ] && [ "$root_needed" = false ] && [ "$arm_translation_needed" = false ]
-}
-
-# Skip initialization if first boot already completed.
-if [ -f /data/.first-boot-done ]; then
-  if [ "$gapps_needed" = true ]; then
-    install_gapps
-    needs_reboot && adb reboot
-  fi
-  [ "$root_needed" = true ] && install_root
-  [ "$arm_translation_needed" = true ] && install_arm_translation
-  apply_settings
-  copy_extras
-  exit 0
+# Create the AVD on first boot only.
+if [ ! -f /data/.first-boot-done ]; then
+  echo "Init AVD ..."
+  echo "no" | avdmanager create avd -n android -k "system-images;android-30;default;x86_64"
 fi
 
-echo "Init AVD ..."
-echo "no" | avdmanager create avd -n android -k "system-images;android-30;default;x86_64"
-
-if [ "$gapps_needed" = true ]; then
-  install_gapps
-  needs_reboot && adb reboot
-fi
-[ "$root_needed" = true ] && install_root
+# Each install is self-contained: prepares the system, applies its changes,
+# reboots, waits for adbd, then writes its done-marker. Safe to run after the
+# first boot — only the missing markers will fire.
+[ "$gapps_needed" = true ]           && install_gapps
+[ "$root_needed" = true ]            && install_root
 [ "$arm_translation_needed" = true ] && install_arm_translation
 apply_settings
 copy_extras
