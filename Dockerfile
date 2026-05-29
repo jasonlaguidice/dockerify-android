@@ -18,6 +18,19 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Bake in Google ndk_translation prebuilts (ARM-on-x86 native bridge).
+# Source: Kaz205 fork (Chrome OS Android 11 / guybrush_cheets) — matches the emulator's API 30.
+ARG NDK_TRANSLATION_REPO=Kaz205/vendor_google_proprietary_ndk_translation-prebuilt
+ARG NDK_TRANSLATION_REF=chromeos_guybrush
+RUN mkdir -p /opt/ndk-translation && \
+    wget -q -O /tmp/ndk.tar.gz \
+        "https://codeload.github.com/${NDK_TRANSLATION_REPO}/tar.gz/refs/heads/${NDK_TRANSLATION_REF}" && \
+    tar -xzf /tmp/ndk.tar.gz \
+        --strip-components=2 \
+        -C /opt/ndk-translation \
+        "$(basename "$NDK_TRANSLATION_REPO")-${NDK_TRANSLATION_REF}/prebuilts" && \
+    rm /tmp/ndk.tar.gz
+
 # Set up Android SDK
 RUN mkdir -p /opt/android-sdk/cmdline-tools && \
     cd /opt/android-sdk/cmdline-tools && \

@@ -75,11 +75,49 @@ install_root() {
   touch /data/.root-done
 }
 
+install_arm_translation() {
+  prepare_system
+  echo "Installing ARM translation (ndk_translation) ..."
+
+  adb push /opt/ndk-translation/bin   /system/
+  adb push /opt/ndk-translation/etc   /system/
+  adb push /opt/ndk-translation/lib   /system/
+  adb push /opt/ndk-translation/lib64 /system/
+
+  adb shell '
+    chmod 755 /system/bin/ndk_translation_program_runner_binfmt_misc /system/bin/ndk_translation_program_runner_binfmt_misc_arm64
+    chmod -R 755 /system/bin/arm /system/bin/arm64
+    for f in /system/build.prop /vendor/build.prop /product/build.prop /system_ext/build.prop /odm/build.prop; do
+      [ -f "$f" ] || continue
+      sed -i -e "/^ro\.product\.cpu\.abilist/d" \
+             -e "/^ro\.dalvik\.vm\.native\.bridge/d" \
+             -e "/^ro\.enable\.native\.bridge/d" \
+             -e "/^ro\.dalvik\.vm\.isa\./d" \
+             -e "/^ro\.ndk_translation\./d" "$f"
+    done
+    cat >> /system/build.prop <<EOF
+ro.product.cpu.abilist=x86_64,x86,arm64-v8a,armeabi-v7a,armeabi
+ro.product.cpu.abilist32=x86,armeabi-v7a,armeabi
+ro.product.cpu.abilist64=x86_64,arm64-v8a
+ro.dalvik.vm.isa.arm=x86
+ro.dalvik.vm.isa.arm64=x86_64
+ro.enable.native.bridge.exec=1
+ro.enable.native.bridge.exec64=1
+ro.dalvik.vm.native.bridge=libndk_translation.so
+ro.ndk_translation.version=0.2.3
+EOF
+  '
+
+  adb reboot
+  touch /data/.arm-translation-done
+}
+
 copy_extras() {
   adb wait-for-device
   # Push any Magisk modules for manual installation later
-  for f in $(ls /extras/*); do
-    adb push $f /sdcard/Download/
+  for f in /extras/*; do
+    [ -e "$f" ] || continue
+    adb push "$f" /sdcard/Download/
   done
 }
 
@@ -89,13 +127,24 @@ socat tcp-listen:"5555",bind="$LOCAL_IP",fork tcp:127.0.0.1:"5555" &
 
 gapps_needed=false
 root_needed=false
+arm_translation_needed=false
 if bool_true "$GAPPS_SETUP" && [ ! -f /data/.gapps-done ]; then gapps_needed=true; fi
 if bool_true "$ROOT_SETUP" && [ ! -f /data/.root-done ]; then root_needed=true; fi
+if bool_true "$ARM_TRANSLATION" && [ ! -f /data/.arm-translation-done ]; then arm_translation_needed=true; fi
+
+needs_reboot() {
+  # Reboot needed if only GAPPS was installed (no root or ARM translation)
+  [ "$gapps_needed" = true ] && [ "$root_needed" = false ] && [ "$arm_translation_needed" = false ]
+}
 
 # Skip initialization if first boot already completed.
 if [ -f /data/.first-boot-done ]; then
-  [ "$gapps_needed" = true ] && install_gapps && [ "$root_needed" = false ] && adb reboot
+  if [ "$gapps_needed" = true ]; then
+    install_gapps
+    needs_reboot && adb reboot
+  fi
   [ "$root_needed" = true ] && install_root
+  [ "$arm_translation_needed" = true ] && install_arm_translation
   apply_settings
   copy_extras
   exit 0
@@ -104,8 +153,12 @@ fi
 echo "Init AVD ..."
 echo "no" | avdmanager create avd -n android -k "system-images;android-30;default;x86_64"
 
-[ "$gapps_needed" = true ] && install_gapps && [ "$root_needed" = false ] && adb reboot
+if [ "$gapps_needed" = true ]; then
+  install_gapps
+  needs_reboot && adb reboot
+fi
 [ "$root_needed" = true ] && install_root
+[ "$arm_translation_needed" = true ] && install_arm_translation
 apply_settings
 copy_extras
 
