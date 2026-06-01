@@ -87,6 +87,10 @@ RUN chmod +x /root/first-boot.sh
 COPY start-emulator.sh /root/start-emulator.sh
 RUN chmod +x /root/start-emulator.sh
 
+# Copy the shared folder sync script
+COPY sync-shared.sh /root/sync-shared.sh
+RUN chmod +x /root/sync-shared.sh
+
 # Expose necessary ports
 EXPOSE 5554 5555
 

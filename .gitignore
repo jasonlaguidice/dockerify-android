@@ -11,4 +11,5 @@ Thumbs.db
 .idea/
 
 # Docker compose data
-data*/
+data*
+shared/

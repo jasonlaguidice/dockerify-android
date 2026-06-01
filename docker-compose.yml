@@ -10,6 +10,7 @@ services:
     volumes:
       - ./data:/data
       - ./extras:/extras
+      - ./shared:/shared
     environment:
       DNS: one.one.one.one
       # RAM_SIZE: 4096
@@ -17,9 +18,10 @@ services:
       #SCREEN_RESOLUTION: 720x720
       # Optional screen density (dpi)
       #SCREEN_DENSITY: 227
-      ROOT_SETUP: 0 # set to 1 to enable rooting
-      GAPPS_SETUP: 0 # set to 1 to install PICO GAPPS
+      ROOT_SETUP: 1 # set to 1 to enable rooting
+      GAPPS_SETUP: 1 # set to 1 to install PICO GAPPS
       ARM_TRANSLATION: 1 # set to 1 to enable ARM translation (allows ARM64 apps)
+      SHARED_FOLDER: 1 # set to 1 to enable host folder sync at /sdcard/shared
     privileged: true
     devices:
       - /dev/kvm
