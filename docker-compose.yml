@@ -8,9 +8,9 @@ services:
     ports:
       - "5555:5555"
     volumes:
-      - ./data:/data
-      - ./extras:/extras
-      - ./shared:/shared
+      - /opt/dockerify-android/data:/data
+      - /opt/dockerify-android/extras:/extras
+      - /opt/dockerify-android/shared:/shared
     environment:
       DNS: one.one.one.one
       # RAM_SIZE: 4096
